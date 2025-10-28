@@ -37,7 +37,7 @@ namespace MauiSsoLibrary.Extensions
 
             services.AddSingleton(configuration);
             services.AddSingleton<ITokenStore, TokenStore>();
-           // services.AddSingleton<IOidcAuthService, OidcAuthService>();
+            services.AddSingleton<IOidcAuthService, OidcAuthService>();
 
             return services;
         }
