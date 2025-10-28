@@ -1,6 +1,7 @@
 ﻿#if ANDROID
 using Android.Content;
 using Android.OS;
+using System;
 
 namespace MauiSsoLibrary.Platforms.Android.Services
 {

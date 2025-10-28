@@ -1,4 +1,7 @@
-﻿namespace MauiSsoLibrary.Services
+﻿using System;
+using System.Threading.Tasks;
+
+namespace MauiSsoLibrary.Services
 {
     public interface ITokenStore
     {

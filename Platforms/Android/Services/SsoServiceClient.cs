@@ -1,5 +1,6 @@
 ﻿#if ANDROID
 using Android.Content;
+using System;
 
 namespace MauiSsoLibrary.Platforms.Android.Services
 {
@@ -46,7 +47,7 @@ namespace MauiSsoLibrary.Platforms.Android.Services
 
                 // Create intent to bind to service
                 var intent = new Intent("com.mauisso.library.ITokenService");
-                intent.SetPackage("com.companyname.mauissotestapp"); // Your app package name
+                intent.SetPackage("com.honeywell.mauissotestapp"); // Your app package name
 
                 // Bind to service (this will start it if not running)
                 var flags = Bind.AutoCreate;

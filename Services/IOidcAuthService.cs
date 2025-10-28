@@ -1,4 +1,6 @@
-﻿namespace MauiSsoLibrary.Services
+﻿using System.Threading.Tasks;
+
+namespace MauiSsoLibrary.Services
 {
     public interface IOidcAuthService
     {
