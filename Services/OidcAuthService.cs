@@ -2,6 +2,7 @@
 using Duende.IdentityModel.OidcClient;
 using Duende.IdentityModel.OidcClient.Browser;
 using System;
+using System.Threading.Tasks;
 
 namespace MauiSsoLibrary.Services
 {

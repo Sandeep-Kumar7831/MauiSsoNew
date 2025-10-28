@@ -4,6 +4,7 @@ using Android.Content;
 using Android.OS;
 using AndroidX.Core.App;
 using MauiSsoLibrary.Services;
+using System;
 
 namespace MauiSsoLibrary.Platforms.Android.Services
 {
