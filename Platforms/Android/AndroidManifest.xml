@@ -3,7 +3,10 @@
           package="com.mauisso.library">
     
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     
     <application>
         <!-- Declare the TokenService -->
@@ -11,10 +14,21 @@
             android:name="com.mauisso.library.TokenService"
             android:enabled="true"
             android:exported="true"
-            android:foregroundServiceType="dataSync">
+            android:foregroundServiceType="dataSync"
+            android:stopWithTask="false">
             <intent-filter>
                 <action android:name="com.mauisso.library.ITokenService" />
             </intent-filter>
         </service>
+
+        <!-- Service restart receiver -->
+        <receiver
+            android:name="com.mauisso.library.TokenService$ServiceRestartReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.mauisso.library.RestartService" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

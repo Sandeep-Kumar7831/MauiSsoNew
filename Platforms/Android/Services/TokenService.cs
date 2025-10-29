@@ -10,7 +10,8 @@ namespace MauiSsoLibrary.Platforms.Android.Services
 {
     [Service(Name = "com.mauisso.library.TokenService",
              Exported = true,
-             Enabled = true)]
+             Enabled = true,
+             ForegroundServiceType = global::Android.Content.PM.ForegroundService.TypeDataSync)]
     [IntentFilter(new[] { "com.mauisso.library.ITokenService" })]
     public class TokenService : Service
     {
@@ -20,15 +21,21 @@ namespace MauiSsoLibrary.Platforms.Android.Services
         private ITokenStore? _tokenStore;
         private bool _isRunning = false;
 
+        // Singleton instance to keep service alive
+        private static TokenService? _instance;
+
         public override void OnCreate()
         {
             base.OnCreate();
 
             try
             {
-                // Create token store directly
+                _instance = this;
+
+                // Use SecureStorage-backed TokenStore
                 _tokenStore = new TokenStore();
                 _binder = new TokenServiceStub(this);
+
                 CreateNotificationChannel();
 
                 System.Diagnostics.Debug.WriteLine("TokenService: OnCreate completed");
@@ -60,6 +67,7 @@ namespace MauiSsoLibrary.Platforms.Android.Services
                 StartAsForeground();
             }
 
+            // Return STICKY to restart service if killed
             return StartCommandResult.Sticky;
         }
 
@@ -69,22 +77,19 @@ namespace MauiSsoLibrary.Platforms.Android.Services
             {
                 var notification = CreateNotification();
 
-                // Use different method based on API level
                 if (Build.VERSION.SdkInt >= BuildVersionCodes.Q)
                 {
-                    // API 29+ (Android 10+)
-                    // For API 34+, you would add foreground service type
-                    // StartForeground(NOTIFICATION_ID, notification, ForegroundService.TypeDataSync);
-                    StartForeground(NOTIFICATION_ID, notification);
+                    // API 29+ with foreground service type
+                    StartForeground(NOTIFICATION_ID, notification,
+                        global::Android.Content.PM.ForegroundService.TypeDataSync);
                 }
                 else
                 {
-                    // API 26-28
                     StartForeground(NOTIFICATION_ID, notification);
                 }
 
                 _isRunning = true;
-                System.Diagnostics.Debug.WriteLine("TokenService: Running as foreground service");
+                System.Diagnostics.Debug.WriteLine("TokenService: Running as foreground service with STICKY mode");
             }
             catch (Exception ex)
             {
@@ -99,13 +104,16 @@ namespace MauiSsoLibrary.Platforms.Android.Services
                 var channel = new NotificationChannel(
                     CHANNEL_ID,
                     "SSO Authentication Service",
-                    NotificationImportance.Low)
+                    NotificationImportance.Default) // Changed to Default for visibility
                 {
-                    Description = "Manages secure authentication tokens for applications"
+                    Description = "Manages secure authentication tokens for applications",
+                    LockscreenVisibility = NotificationVisibility.Public
                 };
 
                 var notificationManager = GetSystemService(NotificationService) as NotificationManager;
                 notificationManager?.CreateNotificationChannel(channel);
+
+                System.Diagnostics.Debug.WriteLine("TokenService: Notification channel created");
             }
         }
 
@@ -113,23 +121,40 @@ namespace MauiSsoLibrary.Platforms.Android.Services
         {
             int iconId = global::Android.Resource.Drawable.IcDialogInfo;
 
-            var intent = new Intent();
-            var pendingIntent = PendingIntent.GetActivity(
-                this,
-                0,
-                intent,
-                Build.VERSION.SdkInt >= BuildVersionCodes.M
-                    ? PendingIntentFlags.Immutable
-                    : PendingIntentFlags.UpdateCurrent);
+            // Create an intent to launch the app when notification is tapped
+            var packageName = ApplicationContext?.PackageName;
+            Intent? launchIntent = null;
+
+            if (!string.IsNullOrEmpty(packageName))
+            {
+                launchIntent = PackageManager?.GetLaunchIntentForPackage(packageName);
+            }
+
+            PendingIntent? pendingIntent = null;
+            if (launchIntent != null)
+            {
+                pendingIntent = PendingIntent.GetActivity(
+                    this,
+                    0,
+                    launchIntent,
+                    Build.VERSION.SdkInt >= BuildVersionCodes.M
+                        ? PendingIntentFlags.Immutable
+                        : PendingIntentFlags.UpdateCurrent);
+            }
 
             var notificationBuilder = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .SetContentTitle("SSO Service Active")
                 .SetContentText("Authentication service is running")
                 .SetSmallIcon(iconId)
-                .SetPriority(NotificationCompat.PriorityLow)
+                .SetPriority(NotificationCompat.PriorityDefault) // Changed to Default
                 .SetOngoing(true)
-                .SetContentIntent(pendingIntent)
-                .SetCategory(NotificationCompat.CategoryService);
+                .SetCategory(NotificationCompat.CategoryService)
+                .SetVisibility(NotificationCompat.VisibilityPublic);
+
+            if (pendingIntent != null)
+            {
+                notificationBuilder.SetContentIntent(pendingIntent);
+            }
 
             return notificationBuilder.Build();
         }
@@ -139,12 +164,24 @@ namespace MauiSsoLibrary.Platforms.Android.Services
             try
             {
                 var token = _tokenStore?.GetAccessToken();
-                System.Diagnostics.Debug.WriteLine($"TokenService: GetAccessToken called, token length: {token?.Length ?? 0}");
+                var length = token?.Length ?? 0;
+                System.Diagnostics.Debug.WriteLine($"TokenService: GetAccessToken - Retrieved token length: {length}");
+
+                if (length > 0)
+                {
+                    System.Diagnostics.Debug.WriteLine($"TokenService: Token preview: {token?.Substring(0, Math.Min(20, length))}...");
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine("TokenService: No token found in secure storage");
+                }
+
                 return token;
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"TokenService: GetAccessToken error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"TokenService: Stack trace: {ex.StackTrace}");
                 return null;
             }
         }
@@ -153,7 +190,9 @@ namespace MauiSsoLibrary.Platforms.Android.Services
         {
             try
             {
-                return _tokenStore?.GetRefreshToken();
+                var token = _tokenStore?.GetRefreshToken();
+                System.Diagnostics.Debug.WriteLine($"TokenService: GetRefreshToken - length: {token?.Length ?? 0}");
+                return token;
             }
             catch (Exception ex)
             {
@@ -166,7 +205,9 @@ namespace MauiSsoLibrary.Platforms.Android.Services
         {
             try
             {
-                return _tokenStore?.GetIdToken();
+                var token = _tokenStore?.GetIdToken();
+                System.Diagnostics.Debug.WriteLine($"TokenService: GetIdToken - length: {token?.Length ?? 0}");
+                return token;
             }
             catch (Exception ex)
             {
@@ -180,7 +221,11 @@ namespace MauiSsoLibrary.Platforms.Android.Services
             try
             {
                 var result = _tokenStore?.IsAuthenticated() ?? false;
+                var hasAccessToken = !string.IsNullOrEmpty(_tokenStore?.GetAccessToken());
+
                 System.Diagnostics.Debug.WriteLine($"TokenService: IsAuthenticated = {result}");
+                System.Diagnostics.Debug.WriteLine($"TokenService: Has access token = {hasAccessToken}");
+
                 return result;
             }
             catch (Exception ex)
@@ -195,7 +240,7 @@ namespace MauiSsoLibrary.Platforms.Android.Services
             try
             {
                 _tokenStore?.ClearTokens();
-                System.Diagnostics.Debug.WriteLine("TokenService: Logout completed");
+                System.Diagnostics.Debug.WriteLine("TokenService: Logout completed - tokens cleared");
             }
             catch (Exception ex)
             {
@@ -205,7 +250,10 @@ namespace MauiSsoLibrary.Platforms.Android.Services
 
         public override bool OnUnbind(Intent? intent)
         {
-            System.Diagnostics.Debug.WriteLine("TokenService: OnUnbind called");
+            System.Diagnostics.Debug.WriteLine("TokenService: OnUnbind - service continues running");
+
+            // Return true to allow rebinding
+            // Service keeps running in foreground
             return true;
         }
 
@@ -215,23 +263,80 @@ namespace MauiSsoLibrary.Platforms.Android.Services
             System.Diagnostics.Debug.WriteLine("TokenService: OnRebind called");
         }
 
+        public override void OnTaskRemoved(Intent? rootIntent)
+        {
+            // This is called when app is swiped away from recent apps
+            System.Diagnostics.Debug.WriteLine("TokenService: OnTaskRemoved - keeping service alive");
+
+            // Restart the service to keep it running
+            var intent = new Intent(ApplicationContext, typeof(TokenService));
+            var pendingIntent = PendingIntent.GetService(
+                ApplicationContext,
+                1,
+                intent,
+                Build.VERSION.SdkInt >= BuildVersionCodes.M
+                    ? PendingIntentFlags.Immutable
+                    : PendingIntentFlags.UpdateCurrent);
+
+            var alarmManager = GetSystemService(AlarmService) as AlarmManager;
+            alarmManager?.Set(
+                AlarmType.ElapsedRealtime,
+                SystemClock.ElapsedRealtime() + 1000,
+                pendingIntent);
+
+            base.OnTaskRemoved(rootIntent);
+        }
+
         public override void OnDestroy()
         {
-            System.Diagnostics.Debug.WriteLine("TokenService: OnDestroy called");
+            System.Diagnostics.Debug.WriteLine("TokenService: OnDestroy - attempting to restart");
+
+            // Try to restart the service
+            var broadcastIntent = new Intent();
+            broadcastIntent.SetAction("com.mauisso.library.RestartService");
+            broadcastIntent.SetClass(this, typeof(ServiceRestartReceiver));
+            SendBroadcast(broadcastIntent);
 
             if (Build.VERSION.SdkInt >= BuildVersionCodes.N)
             {
-                StopForeground(StopForegroundFlags.Remove);
+                StopForeground(StopForegroundFlags.Detach);
             }
             else
             {
-#pragma warning disable CS0618 // Type or member is obsolete
-                StopForeground(true);
+#pragma warning disable CS0618
+                StopForeground(false);
 #pragma warning restore CS0618
             }
 
             _isRunning = false;
+            _instance = null;
+
             base.OnDestroy();
+        }
+
+        // Broadcast receiver to restart service
+        [BroadcastReceiver(Enabled = true, Exported = false)]
+        [IntentFilter(new[] { "com.mauisso.library.RestartService" })]
+        public class ServiceRestartReceiver : BroadcastReceiver
+        {
+            public override void OnReceive(Context? context, Intent? intent)
+            {
+                System.Diagnostics.Debug.WriteLine("ServiceRestartReceiver: Restarting TokenService");
+
+                if (context != null)
+                {
+                    var serviceIntent = new Intent(context, typeof(TokenService));
+
+                    if (Build.VERSION.SdkInt >= BuildVersionCodes.O)
+                    {
+                        context.StartForegroundService(serviceIntent);
+                    }
+                    else
+                    {
+                        context.StartService(serviceIntent);
+                    }
+                }
+            }
         }
     }
 }

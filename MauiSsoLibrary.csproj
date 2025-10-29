@@ -36,13 +36,16 @@
 	<ItemGroup Condition="'$(TargetFramework)' == 'net9.0-android'">
 		<AndroidResource Include="Platforms\Android\Resources\**\*.*" />
 	</ItemGroup>
-	<ItemGroup>
-	  <None Remove="Platforms\Android\aidl\com\mauisso\library\ITokenService.aidl" />
-	</ItemGroup>
-	<ItemGroup>
-	  <AndroidInterfaceDescription Include="Platforms\Android\aidl\com\mauisso\library\ITokenService.aidl">
-	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	  </AndroidInterfaceDescription>
+	<PropertyGroup Condition="'$(TargetFramework)' == 'net9.0-android'">
+		<AndroidGenerateJavaStubs>true</AndroidGenerateJavaStubs>
+		<AndroidEnableAidl>true</AndroidEnableAidl>
+		<AndroidUseAapt2>true</AndroidUseAapt2>
+	</PropertyGroup>
+
+	<ItemGroup Condition="'$(TargetFramework)' == 'net9.0-android'">
+		<AndroidInterfaceDescription Include="Platforms\Android\aidl\com\mauisso\library\ITokenService.aidl">
+			<CopyToOutputDirectory>Never</CopyToOutputDirectory>
+		</AndroidInterfaceDescription>
 	</ItemGroup>
 
 	<ItemGroup>

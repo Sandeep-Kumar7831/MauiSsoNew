@@ -1,4 +1,5 @@
-﻿using Duende.IdentityModel.OidcClient.Browser;
+﻿using Duende.IdentityModel.Client;
+using Duende.IdentityModel.OidcClient.Browser;
 using Microsoft.Maui.Authentication;
 using System;
 using System.Threading;
@@ -16,9 +17,9 @@ namespace MauiSsoLibrary.Services
                     new Uri(options.StartUrl),
                     new Uri(options.EndUrl));
 
-                var url = result.Properties.ContainsKey("url")
-                    ? result.Properties["url"]
-                    : options.EndUrl;
+
+                var url = new RequestUrl("cfauth://com.honeywell.tools.honeywelllauncher/callback")
+                    .Create(new Parameters(result.Properties));
 
                 return new BrowserResult
                 {

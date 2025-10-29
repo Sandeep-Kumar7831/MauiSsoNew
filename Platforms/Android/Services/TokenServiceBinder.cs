@@ -42,7 +42,7 @@ namespace MauiSsoLibrary.Platforms.Android.Services
 
         public IBinder AsBinder()
         {
-            return this.JavaCast<IBinder>();
+            return new Binder();
         }
     }
 }
