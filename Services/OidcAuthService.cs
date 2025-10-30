@@ -73,17 +73,17 @@ namespace MauiSsoLibrary.Services
                 var savedToken = _tokenStore.GetAccessToken();
                 System.Diagnostics.Debug.WriteLine($"OidcAuthService: Verification - saved token length: {savedToken?.Length ?? 0}");
 
-#if ANDROID
-                if (_config.EnableAndroidService)
-                {
-                    System.Diagnostics.Debug.WriteLine("OidcAuthService: Starting Android service...");
-                    StartAndroidService();
+//#if ANDROID
+//                if (_config.EnableAndroidService)
+//                {
+//                    System.Diagnostics.Debug.WriteLine("OidcAuthService: Starting Android service...");
+//                    StartAndroidService();
 
-                    // Give service time to start
-                    await Task.Delay(1000);
-                    System.Diagnostics.Debug.WriteLine("OidcAuthService: Android service start completed");
-                }
-#endif
+//                    // Give service time to start
+//                    await Task.Delay(1000);
+//                    System.Diagnostics.Debug.WriteLine("OidcAuthService: Android service start completed");
+//                }
+//#endif
 
                 return new AuthResult
                 {

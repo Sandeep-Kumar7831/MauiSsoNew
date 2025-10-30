@@ -32,17 +32,28 @@ namespace MauiSsoLibrary.Platforms.Android.Services
             {
                 _instance = this;
 
-                // Use SecureStorage-backed TokenStore
-                _tokenStore = new TokenStore();
+                // CRITICAL: Use SharedTokenStore on Android for cross-process access
+                // The app and service must use the same storage backend
+                var context = global::Android.App.Application.Context;
+                if (context == null)
+                {
+                    throw new InvalidOperationException("Android Application Context is null");
+                }
+
+                System.Diagnostics.Debug.WriteLine("TokenService: OnCreate - Initializing SharedTokenStore");
+
+                _tokenStore = new SharedTokenStore(context);
                 _binder = new TokenServiceStub(this);
 
                 CreateNotificationChannel();
 
-                System.Diagnostics.Debug.WriteLine("TokenService: OnCreate completed");
+                System.Diagnostics.Debug.WriteLine("TokenService: OnCreate completed successfully");
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"TokenService OnCreate error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"TokenService OnCreate stack trace: {ex.StackTrace}");
+                throw;
             }
         }
 
