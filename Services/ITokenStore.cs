@@ -8,6 +8,8 @@ namespace MauiSsoLibrary.Services
         string? GetAccessToken();
         string? GetRefreshToken();
         string? GetIdToken();
+        string? GetDPoPJwk();
+        void SaveDPoPJwk(string jwkJson);
         bool IsAuthenticated();
         Task SaveTokensAsync(TokenResponse tokens);
         void ClearTokens();

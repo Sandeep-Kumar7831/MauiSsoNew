@@ -7,8 +7,7 @@ using System.Threading.Tasks;
 namespace MauiSsoLibrary.Services
 {
     /// <summary>
-    /// Token store that uses Android SharedPreferences for cross-process access
-    /// This allows both the app and the service to access the same tokens
+    /// Token store that uses Android SharedPreferences with DPoP JWK support
     /// </summary>
     public class SharedTokenStore : ITokenStore
     {
@@ -17,6 +16,7 @@ namespace MauiSsoLibrary.Services
         private const string REFRESH_TOKEN_KEY = "sso_refresh_token";
         private const string ID_TOKEN_KEY = "sso_id_token";
         private const string EXPIRES_AT_KEY = "sso_expires_at";
+        private const string DPOP_JWK_KEY = "sso_dpop_jwk";
 
         private readonly ISharedPreferences _prefs;
 
@@ -25,10 +25,8 @@ namespace MauiSsoLibrary.Services
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
 
-            // Use MODE_PRIVATE for security but accessible within same app
             _prefs = context.GetSharedPreferences(PREFS_NAME, FileCreationMode.Private);
-
-            System.Diagnostics.Debug.WriteLine($"SharedTokenStore: Initialized with context: {context.GetType().Name}");
+            System.Diagnostics.Debug.WriteLine($"SharedTokenStore: Initialized with DPoP JWK support");
         }
 
         public string? GetAccessToken()
@@ -37,12 +35,6 @@ namespace MauiSsoLibrary.Services
             {
                 var token = _prefs.GetString(ACCESS_TOKEN_KEY, null);
                 System.Diagnostics.Debug.WriteLine($"SharedTokenStore: GetAccessToken - length: {token?.Length ?? 0}");
-
-                if (!string.IsNullOrEmpty(token))
-                {
-                    System.Diagnostics.Debug.WriteLine($"SharedTokenStore: Token preview: {token.Substring(0, Math.Min(20, token.Length))}...");
-                }
-
                 return token;
             }
             catch (Exception ex)
@@ -82,6 +74,38 @@ namespace MauiSsoLibrary.Services
             }
         }
 
+        public string? GetDPoPJwk()
+        {
+            try
+            {
+                var jwk = _prefs.GetString(DPOP_JWK_KEY, null);
+                System.Diagnostics.Debug.WriteLine($"SharedTokenStore: GetDPoPJwk - present: {!string.IsNullOrEmpty(jwk)}");
+                return jwk;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"SharedTokenStore: GetDPoPJwk error: {ex.Message}");
+                return null;
+            }
+        }
+
+        public void SaveDPoPJwk(string jwkJson)
+        {
+            try
+            {
+                System.Diagnostics.Debug.WriteLine("SharedTokenStore: Saving DPoP JWK");
+                var editor = _prefs.Edit();
+                editor.PutString(DPOP_JWK_KEY, jwkJson);
+                var success = editor.Commit();
+                System.Diagnostics.Debug.WriteLine($"SharedTokenStore: SaveDPoPJwk - Commit result: {success}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"SharedTokenStore: SaveDPoPJwk error: {ex.Message}");
+                throw;
+            }
+        }
+
         public bool IsAuthenticated()
         {
             try
@@ -89,26 +113,22 @@ namespace MauiSsoLibrary.Services
                 var accessToken = GetAccessToken();
                 if (string.IsNullOrEmpty(accessToken))
                 {
-                    System.Diagnostics.Debug.WriteLine("SharedTokenStore: IsAuthenticated = false (no token)");
+                    System.Diagnostics.Debug.WriteLine("SharedTokenStore: IsAuthenticated = false");
                     return false;
                 }
 
                 var expiresAtStr = _prefs.GetString(EXPIRES_AT_KEY, null);
                 if (string.IsNullOrEmpty(expiresAtStr))
-                {
-                    System.Diagnostics.Debug.WriteLine("SharedTokenStore: IsAuthenticated = true (no expiry set)");
-                    return true; // Has token but no expiry
-                }
+                    return true;
 
                 if (DateTimeOffset.TryParse(expiresAtStr, out var expiresAt))
                 {
-                    var isValid = DateTimeOffset.UtcNow < expiresAt.AddMinutes(-5); // 5 min buffer
-                    System.Diagnostics.Debug.WriteLine($"SharedTokenStore: IsAuthenticated = {isValid} (expires: {expiresAt})");
+                    var isValid = DateTimeOffset.UtcNow < expiresAt.AddMinutes(-5);
+                    System.Diagnostics.Debug.WriteLine($"SharedTokenStore: IsAuthenticated = {isValid}");
                     return isValid;
                 }
 
-                System.Diagnostics.Debug.WriteLine("SharedTokenStore: IsAuthenticated = true (invalid expiry format)");
-                return true; // Has token but can't parse expiry
+                return true;
             }
             catch (Exception ex)
             {
@@ -121,7 +141,7 @@ namespace MauiSsoLibrary.Services
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine($"SharedTokenStore: SaveTokensAsync - Access token length: {tokens.AccessToken?.Length ?? 0}");
+                System.Diagnostics.Debug.WriteLine($"SharedTokenStore: SaveTokensAsync");
 
                 var editor = _prefs.Edit();
 
@@ -139,16 +159,11 @@ namespace MauiSsoLibrary.Services
                 var success = editor.Commit();
                 System.Diagnostics.Debug.WriteLine($"SharedTokenStore: SaveTokensAsync - Commit result: {success}");
 
-                // Verify save
-                var savedToken = _prefs.GetString(ACCESS_TOKEN_KEY, null);
-                System.Diagnostics.Debug.WriteLine($"SharedTokenStore: Verification - saved token length: {savedToken?.Length ?? 0}");
-
                 await Task.CompletedTask;
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"SharedTokenStore: SaveTokensAsync error: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"SharedTokenStore: Stack trace: {ex.StackTrace}");
                 throw;
             }
         }
@@ -164,6 +179,7 @@ namespace MauiSsoLibrary.Services
                 editor.Remove(REFRESH_TOKEN_KEY);
                 editor.Remove(ID_TOKEN_KEY);
                 editor.Remove(EXPIRES_AT_KEY);
+                editor.Remove(DPOP_JWK_KEY);
 
                 var success = editor.Commit();
                 System.Diagnostics.Debug.WriteLine($"SharedTokenStore: ClearTokens - Commit result: {success}");

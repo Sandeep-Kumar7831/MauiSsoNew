@@ -10,6 +10,7 @@ namespace MauiSsoLibrary.Services
         private const string REFRESH_TOKEN_KEY = "sso_refresh_token";
         private const string ID_TOKEN_KEY = "sso_id_token";
         private const string EXPIRES_AT_KEY = "sso_expires_at";
+        private const string DPOP_JWK_KEY = "sso_dpop_jwk";
 
         public string? GetAccessToken()
         {
@@ -47,6 +48,31 @@ namespace MauiSsoLibrary.Services
             }
         }
 
+        public string? GetDPoPJwk()
+        {
+            try
+            {
+                return SecureStorage.GetAsync(DPOP_JWK_KEY).Result;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        public void SaveDPoPJwk(string jwkJson)
+        {
+            try
+            {
+                SecureStorage.SetAsync(DPOP_JWK_KEY, jwkJson).Wait();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"TokenStore: SaveDPoPJwk error: {ex.Message}");
+                throw;
+            }
+        }
+
         public bool IsAuthenticated()
         {
             var accessToken = GetAccessToken();
@@ -58,7 +84,7 @@ namespace MauiSsoLibrary.Services
                 var expiresAtStr = SecureStorage.GetAsync(EXPIRES_AT_KEY).Result;
                 if (DateTime.TryParse(expiresAtStr, out var expiresAt))
                 {
-                    return DateTime.UtcNow < expiresAt.AddMinutes(-5); // 5 min buffer
+                    return DateTime.UtcNow < expiresAt.AddMinutes(-5);
                 }
             }
             catch { }
@@ -80,6 +106,9 @@ namespace MauiSsoLibrary.Services
             SecureStorage.Remove(REFRESH_TOKEN_KEY);
             SecureStorage.Remove(ID_TOKEN_KEY);
             SecureStorage.Remove(EXPIRES_AT_KEY);
+            SecureStorage.Remove(DPOP_JWK_KEY);
         }
     }
 }
+
+
